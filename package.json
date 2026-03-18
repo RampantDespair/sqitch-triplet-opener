@@ -1,7 +1,7 @@
 {
   "name": "sqitch-triplet-opener",
   "displayName": "Sqitch Triplet Opener",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Open matching Sqitch deploy, revert, and verify files side by side from the Explorer context menu.",
   "categories": [
     "Other"
@@ -37,6 +37,10 @@
       {
         "command": "sqitchTripletOpener.openTriplet",
         "title": "Open Sqitch Deploy/Revert/Verify"
+      },
+      {
+        "command": "sqitchTripletOpener.openTripletFolder",
+        "title": "Open All Sqitch Triplets in Folder"
       }
     ],
     "configuration": {
@@ -66,7 +70,12 @@
         {
           "command": "sqitchTripletOpener.openTriplet",
           "when": "resourceExtname == .sql",
-          "group": "navigation"
+          "group": "sqitch@999"
+        },
+        {
+          "command": "sqitchTripletOpener.openTripletFolder",
+          "when": "explorerResourceIsFolder",
+          "group": "sqitch@999"
         }
       ]
     }

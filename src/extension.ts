@@ -9,7 +9,7 @@ const TRIPLET_TYPES: TripletType[] = ["deploy", "revert", "verify"];
 const DEFAULT_ORDER: TripletType[] = ["deploy", "revert", "verify"];
 
 export function activate(context: vscode.ExtensionContext): void {
-  const disposable = vscode.commands.registerCommand(
+  const openTriplet = vscode.commands.registerCommand(
     "sqitchTripletOpener.openTriplet",
     async (uri: vscode.Uri) => {
       const filePath = uri.fsPath;
@@ -25,45 +25,63 @@ export function activate(context: vscode.ExtensionContext): void {
 
       const { changeName, root } = tripletInfo;
 
-      // Step 2: Build all three paths
-      const paths = buildTripletPaths(root, changeName);
+      // Step 2: Build and validate the triplet, then open it
+      await openTripletForChange(root, changeName);
+    },
+  );
 
-      // Step 3: Verify all three files exist before opening anything
-      const missing: string[] = [];
-      for (const type of TRIPLET_TYPES) {
-        if (!fs.existsSync(paths[type])) {
-          missing.push(`${type}: ${paths[type]}`);
-        }
+  const openTripletFolder = vscode.commands.registerCommand(
+    "sqitchTripletOpener.openTripletFolder",
+    async (uri: vscode.Uri) => {
+      const folderPath = uri.fsPath;
+
+      // Step 1: Collect all .sql files directly in the folder (non-recursive)
+      let entries: fs.Dirent[];
+      try {
+        entries = fs.readdirSync(folderPath, { withFileTypes: true });
+      } catch {
+        vscode.window.showErrorMessage(`Cannot read directory:\n${folderPath}`);
+        return;
       }
 
-      if (missing.length > 0) {
+      const sqlFiles = entries
+        .filter((e) => e.isFile() && e.name.endsWith(".sql"))
+        .map((e) => path.join(folderPath, e.name));
+
+      if (sqlFiles.length === 0) {
         vscode.window.showErrorMessage(
-          `Cannot open Sqitch triplet — the following file(s) are missing:\n${missing.join("\n")}`,
+          `No .sql files found directly in:\n${folderPath}`,
         );
         return;
       }
 
-      // Step 4: Determine the ordered list of files to open
-      const order = getTripletOrder();
-      const orderedUris = order.map((type) => vscode.Uri.file(paths[type]));
+      // Step 2: Resolve each sql file to a triplet and open it
+      // Collect all errors and report them together rather than bailing on the first one
+      const errors: string[] = [];
 
-      // Step 5: Determine which view columns to use
-      // Reuse existing editor groups if present, otherwise use One/Two/Three
-      const existingGroups = vscode.window.tabGroups.all;
-      const columns: vscode.ViewColumn[] = [
-        existingGroups[0]?.viewColumn ?? vscode.ViewColumn.One,
-        existingGroups[1]?.viewColumn ?? vscode.ViewColumn.Two,
-        existingGroups[2]?.viewColumn ?? vscode.ViewColumn.Three,
-      ];
+      for (const filePath of sqlFiles) {
+        const tripletInfo = findTripletRoot(filePath);
+        if (!tripletInfo) {
+          errors.push(`Skipped (no triplet ancestor): ${filePath}`);
+          continue;
+        }
 
-      // Step 6: Open files, always focusing the last opened (append focus behavior)
-      for (let i = 0; i < orderedUris.length; i++) {
-        await openInGroup(orderedUris[i], columns[i]);
+        const { changeName, root } = tripletInfo;
+        const result = await openTripletForChange(root, changeName);
+        if (result !== "ok") {
+          errors.push(result);
+        }
+      }
+
+      if (errors.length > 0) {
+        vscode.window.showWarningMessage(
+          `Sqitch Triplet Opener — some files had issues:\n${errors.join("\n")}`,
+        );
       }
     },
   );
 
-  context.subscriptions.push(disposable);
+  context.subscriptions.push(openTriplet, openTripletFolder);
 }
 
 export function deactivate(): void {}
@@ -144,4 +162,44 @@ async function openInGroup(
     preview: false,
     viewColumn,
   });
+}
+
+/**
+ * Builds paths, validates all three files exist, then opens them.
+ * Returns "ok" on success, or an error string that the caller can surface.
+ */
+async function openTripletForChange(
+  root: string,
+  changeName: string,
+): Promise<"ok" | string> {
+  const paths = buildTripletPaths(root, changeName);
+
+  const missing: string[] = [];
+  for (const type of TRIPLET_TYPES) {
+    if (!fs.existsSync(paths[type])) {
+      missing.push(`${type}: ${paths[type]}`);
+    }
+  }
+
+  if (missing.length > 0) {
+    const msg = `Cannot open Sqitch triplet — missing file(s):\n${missing.join("\n")}`;
+    vscode.window.showErrorMessage(msg);
+    return msg;
+  }
+
+  const order = getTripletOrder();
+  const orderedUris = order.map((type) => vscode.Uri.file(paths[type]));
+
+  const existingGroups = vscode.window.tabGroups.all;
+  const columns: vscode.ViewColumn[] = [
+    existingGroups[0]?.viewColumn ?? vscode.ViewColumn.One,
+    existingGroups[1]?.viewColumn ?? vscode.ViewColumn.Two,
+    existingGroups[2]?.viewColumn ?? vscode.ViewColumn.Three,
+  ];
+
+  for (let i = 0; i < orderedUris.length; i++) {
+    await openInGroup(orderedUris[i], columns[i]);
+  }
+
+  return "ok";
 }
