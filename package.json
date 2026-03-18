@@ -1,0 +1,94 @@
+{
+  "name": "sqitch-triplet-opener",
+  "displayName": "Sqitch Triplet Opener",
+  "version": "1.0.0",
+  "description": "Open matching Sqitch deploy, revert, and verify files side by side from the Explorer context menu.",
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "sqitch",
+    "triplet",
+    "opener",
+    "vscode",
+    "extension"
+  ],
+  "homepage": "https://github.com/RampantDespair/sqitch-triplet-opener#readme",
+  "bugs": {
+    "url": "https://github.com/RampantDespair/sqitch-triplet-opener/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RampantDespair/sqitch-triplet-opener.git"
+  },
+  "license": "MIT",
+  "author": "RampantDespair",
+  "publisher": "RampantDespair",
+  "type": "module",
+  "main": "out/extension.js",
+  "scripts": {
+    "compile": "tsc -p ./",
+    "package": "vsce package",
+    "vscode:prepublish": "npm run compile",
+    "watch": "tsc -watch -p ./"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "sqitchTripletOpener.openTriplet",
+        "title": "Open Sqitch Deploy/Revert/Verify"
+      }
+    ],
+    "configuration": {
+      "title": "Sqitch Triplet Opener",
+      "properties": {
+        "sqitchTripletOpener.order": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "deploy",
+              "revert",
+              "verify"
+            ]
+          },
+          "default": [
+            "deploy",
+            "revert",
+            "verify"
+          ],
+          "description": "Order in which the deploy, revert, and verify files are opened in editor groups."
+        }
+      }
+    },
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "sqitchTripletOpener.openTriplet",
+          "when": "resourceExtname == .sql",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/vscode": "^1.110.0",
+    "@vscode/vsce": "^3.7.1",
+    "eslint": "^9.39.4",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-n": "^17.24.0",
+    "eslint-plugin-perfectionist": "^5.6.0",
+    "globals": "^17.4.0",
+    "patch-package": "^8.0.1",
+    "prettier": "^3.8.1",
+    "prettier-plugin-packagejson": "^3.0.2",
+    "type-fest": "^5.4.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.0"
+  },
+  "engines": {
+    "vscode": "^1.110.0"
+  }
+}
