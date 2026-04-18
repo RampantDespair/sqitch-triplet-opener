@@ -11,7 +11,14 @@ const DEFAULT_ORDER: TripletType[] = ["deploy", "revert", "verify"];
 export function activate(context: vscode.ExtensionContext): void {
   const openTriplet = vscode.commands.registerCommand(
     "sqitchTripletOpener.openTriplet",
-    async (uri: vscode.Uri) => {
+    async (firstArg: unknown) => {
+      const uri = resourceUriOrFirst(firstArg);
+      if (uri == null) {
+        vscode.window.showErrorMessage(
+          "Sqitch Triplet Opener: no file selected. Right-click a .sql file in the Explorer.",
+        );
+        return;
+      }
       const filePath = uri.fsPath;
 
       // Step 1: Identify triplet root by walking up directories
@@ -32,7 +39,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const openTripletFolder = vscode.commands.registerCommand(
     "sqitchTripletOpener.openTripletFolder",
-    async (uri: vscode.Uri) => {
+    async (firstArg: unknown) => {
+      const uri = resourceUriOrFirst(firstArg);
+      if (uri == null) {
+        vscode.window.showErrorMessage(
+          "Sqitch Triplet Opener: no folder selected. Right-click a folder in the Explorer.",
+        );
+        return;
+      }
       const folderPath = uri.fsPath;
 
       // Step 1: Collect all .sql files directly in the folder (non-recursive)
@@ -190,16 +204,35 @@ async function openTripletForChange(
   const order = getTripletOrder();
   const orderedUris = order.map((type) => vscode.Uri.file(paths[type]));
 
-  const existingGroups = vscode.window.tabGroups.all;
-  const columns: vscode.ViewColumn[] = [
-    existingGroups[0]?.viewColumn ?? vscode.ViewColumn.One,
-    existingGroups[1]?.viewColumn ?? vscode.ViewColumn.Two,
-    existingGroups[2]?.viewColumn ?? vscode.ViewColumn.Three,
-  ];
-
-  for (let i = 0; i < orderedUris.length; i++) {
-    await openInGroup(orderedUris[i], columns[i]);
-  }
+  // Use ViewColumn.Beside for 2nd and 3rd files. Numeric ViewColumn.Two/Three
+  // only apply when those groups already exist; the workbench may otherwise
+  // open in the active group (e.g. after a Cursor/VS Code update), so
+  // "Beside" reliably creates the split layout.
+  const firstCol =
+    vscode.window.tabGroups.all[0]?.viewColumn ?? vscode.ViewColumn.One;
+  await openInGroup(orderedUris[0], firstCol);
+  await openInGroup(orderedUris[1], vscode.ViewColumn.Beside);
+  await openInGroup(orderedUris[2], vscode.ViewColumn.Beside);
 
   return "ok";
+}
+
+/**
+ * Explorer context / multi-select: argument may be a single Uri, Uri[], or
+ * (in some builds) the resource may be missing; normalize before use.
+ */
+function resourceUriOrFirst(uris: unknown): undefined | vscode.Uri {
+  if (uris == null) {
+    return undefined;
+  }
+  if (Array.isArray(uris)) {
+    if (uris.length < 1) {
+      return undefined;
+    }
+    return uris[0] as vscode.Uri;
+  }
+  if (typeof (uris as vscode.Uri).fsPath === "string") {
+    return uris as vscode.Uri;
+  }
+  return undefined;
 }
